@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IoT Dashboard - Quản lý Phòng Học</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+
+  <!-- React 18 UMD -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
+  <!-- Babel Standalone (JSX transpiler) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Chart.js (self-contained, không cần dependency phụ) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+
+  <style>
+    :root {
+      --bg-primary:    #0d1b2a;
+      --bg-secondary:  #112240;
+      --bg-card:       #1a2f4e;
+      --bg-card-hover: #1e3a5f;
+      --accent:        #00d4ff;
+      --accent2:       #0094b3;
+      --green:         #00e676;
+      --red:           #ff5252;
+      --orange:        #ffab40;
+      --purple:        #b39ddb;
+      --txt:           #e8f4f8;
+      --txt2:          #8bafd4;
+      --muted:         #4a6fa5;
+      --border:        #1e3a5f;
+      --sw: 260px;
+      --tr: all 0.3s cubic-bezier(.4,0,.2,1);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family:'Inter',sans-serif; background:var(--bg-primary); color:var(--txt); overflow-x:hidden; }
+    ::-webkit-scrollbar{width:5px} ::-webkit-scrollbar-track{background:var(--bg-primary)} ::-webkit-scrollbar-thumb{background:var(--accent2);border-radius:3px}
+
+    /* ─── LAYOUT ─── */
+    .app-layout { display:flex; min-height:100vh; }
+
+    /* ─── SIDEBAR ─── */
+    .sidebar {
+      width:var(--sw); background:var(--bg-secondary);
+      border-right:1px solid var(--border);
+      display:flex; flex-direction:column;
+      position:fixed; top:0; left:0; height:100vh; z-index:100;
+    }
+    .sidebar-logo { padding:26px 22px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; }
+    .logo-icon {
+      width:40px; height:40px; flex-shrink:0;
+      background:linear-gradient(135deg,var(--accent),var(--accent2));
+      border-radius:10px; display:flex; align-items:center; justify-content:center;
+      font-size:19px; color:var(--bg-primary); font-weight:800;
+      box-shadow:0 4px 15px rgba(0,212,255,.3);
+    }
+    .logo-text  { font-size:15px; font-weight:700; line-height:1.3; }
+    .logo-sub   { font-size:10.5px; color:var(--muted); }
+    .sidebar-nav { flex:1; padding:18px 12px; overflow-y:auto; }
+    .nav-lbl { font-size:10px; font-weight:700; color:var(--muted); letter-spacing:.12em; text-transform:uppercase; padding:0 12px; margin:14px 0 6px; }
+    .nav-item {
+      display:flex; align-items:center; gap:11px; padding:10px 14px;
+      border-radius:10px; cursor:pointer; transition:var(--tr);
+      margin-bottom:3px; color:var(--txt2); font-size:13.5px; font-weight:500;
+      position:relative; border:1px solid transparent;
+    }
+    .nav-item:hover { background:rgba(0,212,255,.08); color:var(--txt); }
+    .nav-item.active {
+      background:linear-gradient(135deg,rgba(0,212,255,.18),rgba(0,148,179,.08));
+      color:var(--accent); border-color:rgba(0,212,255,.25);
+    }
+    .nav-item.active::before {
+      content:''; position:absolute; left:0; top:50%; transform:translateY(-50%);
+      width:3px; height:58%; background:var(--accent); border-radius:0 2px 2px 0;
+      box-shadow:0 0 8px var(--accent);
+    }
+    .nav-icon { font-size:17px; width:20px; text-align:center; flex-shrink:0; }
+    .sidebar-footer { padding:14px 12px; border-top:1px solid var(--border); }
+    .s-user { display:flex; align-items:center; gap:10px; padding:10px 13px; border-radius:10px; background:rgba(0,212,255,.05); }
+    .u-avatar { width:33px; height:33px; background:linear-gradient(135deg,var(--accent),#6c63ff); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; color:#fff; flex-shrink:0; }
+    .u-name { font-size:13px; font-weight:600; }
+    .u-role { font-size:11px; color:var(--muted); }
+
+    /* ─── MAIN ─── */
+    .main-content { margin-left:var(--sw); flex:1; display:flex; flex-direction:column; }
+    .topbar {
+      background:var(--bg-secondary); border-bottom:1px solid var(--border);
+      padding:15px 30px; display:flex; align-items:center; justify-content:space-between;
+      position:sticky; top:0; z-index:50;
+    }
+    .topbar-title   { font-size:19px; font-weight:700; }
+    .topbar-sub     { font-size:11.5px; color:var(--muted); margin-top:2px; }
+    .status-badge   { display:flex; align-items:center; gap:6px; padding:5px 12px; background:rgba(0,230,118,.1); border:1px solid rgba(0,230,118,.3); border-radius:20px; font-size:12px; color:var(--green); font-weight:500; }
+    .status-dot     { width:6px; height:6px; border-radius:50%; background:var(--green); animation:pulse 2s infinite; }
+    @keyframes pulse{ 0%,100%{box-shadow:0 0 0 0 rgba(0,230,118,.4)} 50%{box-shadow:0 0 0 4px rgba(0,230,118,0)} }
+    .page-content   { padding:26px 30px; flex:1; }
+
+    /* ─── METRIC CARDS ─── */
+    .metric-card {
+      background:var(--bg-card); border:1px solid var(--border);
+      border-radius:16px; padding:22px;
+      position:relative; overflow:hidden; transition:var(--tr); height:100%;
+    }
+    .metric-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; }
+    .mc-temp::before     { background:linear-gradient(90deg,#ff6b6b,#ff8e53); }
+    .mc-humid::before    { background:linear-gradient(90deg,var(--accent),#6c63ff); }
+    .mc-light::before    { background:linear-gradient(90deg,var(--orange),#ffd740); }
+    .metric-card:hover   { background:var(--bg-card-hover); border-color:rgba(0,212,255,.3); transform:translateY(-2px); box-shadow:0 8px 30px rgba(0,0,0,.3); }
+    .mc-icon { width:46px; height:46px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:21px; margin-bottom:14px; }
+    .mc-temp .mc-icon    { background:rgba(255,107,107,.15); color:#ff6b6b; }
+    .mc-humid .mc-icon   { background:rgba(0,212,255,.15); color:var(--accent); }
+    .mc-light .mc-icon   { background:rgba(255,171,64,.15); color:var(--orange); }
+    .mc-lbl  { font-size:10.5px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.08em; margin-bottom:7px; }
+    .mc-val  { font-size:40px; font-weight:800; line-height:1; }
+    .mc-temp .mc-val     { color:#ff6b6b; }
+    .mc-humid .mc-val    { color:var(--accent); }
+    .mc-light .mc-val    { color:var(--orange); }
+    .mc-unit { font-size:15px; color:var(--txt2); vertical-align:super; }
+    .mc-sub  { font-size:11.5px; color:var(--muted); margin-top:11px; display:flex; align-items:center; gap:6px; }
+    .mc-trend { font-size:11px; padding:2px 8px; border-radius:20px; font-weight:600; }
+    .tr-up   { background:rgba(0,230,118,.15); color:var(--green); }
+    .tr-down { background:rgba(255,82,82,.15);  color:var(--red); }
+    .tr-stab { background:rgba(0,212,255,.15);  color:var(--accent); }
+
+    /* ─── CHART CARD ─── */
+    .chart-card { background:var(--bg-card); border:1px solid var(--border); border-radius:16px; padding:22px; }
+    .chart-title  { font-size:15px; font-weight:700; }
+    .chart-sub    { font-size:11.5px; color:var(--muted); margin-top:3px; }
+    .leg-item { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--txt2); }
+    .leg-dot  { width:8px; height:8px; border-radius:50%; display:inline-block; }
+
+    /* ─── DEVICE CARDS ─── */
+    .device-card { background:var(--bg-card); border:1px solid var(--border); border-radius:16px; padding:22px; transition:var(--tr); position:relative; overflow:hidden; height:100%; }
+    .device-card.on::after { content:''; position:absolute; bottom:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,var(--green),transparent); }
+    .device-card:hover     { border-color:rgba(0,212,255,.25); box-shadow:0 4px 18px rgba(0,0,0,.2); }
+    .dev-icon { width:50px; height:50px; border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:23px; margin-bottom:14px; transition:var(--tr); }
+    .device-card.on  .dev-icon { background:rgba(0,230,118,.15); color:var(--green); box-shadow:0 0 18px rgba(0,230,118,.2); }
+    .device-card.off .dev-icon { background:rgba(255,255,255,.04); color:var(--muted); }
+    .dev-name  { font-size:14.5px; font-weight:600; margin-bottom:3px; }
+    .dev-st-on { font-size:12px; color:var(--green); font-weight:500; }
+    .dev-st-off{ font-size:12px; color:var(--muted); font-weight:500; }
+
+    /* Toggle switch */
+    .toggle-sw { position:relative; display:inline-block; width:48px; height:26px; }
+    .toggle-sw input { opacity:0; width:0; height:0; }
+    .tog-slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:rgba(255,255,255,.1); border-radius:26px; transition:.3s; border:1px solid rgba(255,255,255,.1); }
+    .tog-slider::before { position:absolute; content:''; height:18px; width:18px; left:3px; bottom:3px; background:rgba(255,255,255,.6); border-radius:50%; transition:.3s; }
+    .toggle-sw input:checked+.tog-slider { background:var(--green); border-color:var(--green); box-shadow:0 0 12px rgba(0,230,118,.4); }
+    .toggle-sw input:checked+.tog-slider::before { transform:translateX(22px); background:#fff; }
+
+    /* ─── SECTION TITLE ─── */
+    .sec-title { font-size:14.5px; font-weight:700; display:flex; align-items:center; gap:8px; }
+    .sec-title::before { content:''; width:3px; height:16px; background:var(--accent); border-radius:2px; flex-shrink:0; }
+
+    /* ─── FILTER BAR ─── */
+    .filter-bar { background:var(--bg-card); border:1px solid var(--border); border-radius:16px; padding:18px 22px; }
+    .f-lbl { font-size:10.5px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:5px; }
+    .fc-dark {
+      background-color:var(--bg-secondary) !important; border:1px solid var(--border) !important;
+      color:var(--txt) !important; border-radius:10px !important; font-size:13px !important;
+      padding:8px 13px !important; font-family:'Inter',sans-serif !important;
+      transition:var(--tr) !important;
+    }
+    .fc-dark:focus { border-color:var(--accent) !important; box-shadow:0 0 0 3px rgba(0,212,255,.1) !important; outline:none !important; }
+    .fc-dark::placeholder { color:var(--muted) !important; }
+    .fc-dark option { background:var(--bg-secondary); color:var(--txt); }
+    select.fc-dark {
+      background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23a3b8cc' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+      background-repeat: no-repeat !important;
+      background-position: right 0.75rem center !important;
+      background-size: 16px 12px !important;
+      appearance: none;
+      padding-right: 2.25rem !important;
+    }
+    .btn-search {
+      background:linear-gradient(135deg,var(--accent),var(--accent2)) !important;
+      border:none !important; color:var(--bg-primary) !important; font-weight:600 !important;
+      font-size:13px !important; padding:8px 20px !important; border-radius:10px !important;
+      white-space:nowrap; cursor:pointer; transition:var(--tr) !important;
+    }
+    .btn-search:hover { transform:translateY(-1px); box-shadow:0 4px 14px rgba(0,212,255,.35) !important; }
+    .btn-rst {
+      background:rgba(255,255,255,.06) !important; border:1px solid var(--border) !important;
+      color:var(--txt2) !important; border-radius:10px !important;
+      padding:8px 12px !important; font-size:13px !important; cursor:pointer; transition:var(--tr) !important;
+    }
+
+    /* ─── DATA TABLE ─── */
+    .tbl-wrap { background:var(--bg-card); border:1px solid var(--border); border-radius:16px; overflow:hidden; }
+    .tbl-head { padding:14px 22px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+    .tbl-count { font-size:13px; color:var(--muted); }
+    .tbl-count em { color:var(--accent); font-weight:600; font-style:normal; }
+    table.dt { width:100%; border-collapse:separate; border-spacing:0; }
+    table.dt thead th { background:rgba(0,0,0,.2); color:var(--muted); font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:.08em; padding:12px 18px; border-bottom:1px solid var(--border); white-space:nowrap; }
+    table.dt tbody tr { transition:var(--tr); }
+    table.dt tbody tr:hover { background:rgba(0,212,255,.04); }
+    table.dt tbody td { padding:12px 18px; font-size:13px; color:var(--txt); border-bottom:1px solid rgba(30,58,95,.5); vertical-align:middle; }
+    table.dt tbody tr:last-child td { border-bottom:none; }
+    .c-id   { font-family:'Courier New',monospace; color:var(--muted); font-size:12px; }
+    .c-badge { padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; }
+    .b-temp  { background:rgba(255,107,107,.15); color:#ff6b6b; }
+    .b-humid { background:rgba(0,212,255,.15); color:var(--accent); }
+    .b-light { background:rgba(255,171,64,.15); color:var(--orange); }
+    .dot-ind { width:7px; height:7px; border-radius:50%; flex-shrink:0; display:inline-block; margin-right:6px; }
+    .dot-ok  { background:var(--green); box-shadow:0 0 5px rgba(0,230,118,.6); }
+    .dot-err { background:var(--red);   box-shadow:0 0 5px rgba(255,82,82,.6); }
+
+    /* pagination */
+    .pg-wrap  { padding:14px 22px; border-top:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+    .pg-info  { font-size:12px; color:var(--muted); }
+    .pg-btns  { display:flex; gap:4px; }
+    .pg-btn   { width:30px; height:30px; display:flex; align-items:center; justify-content:center; border-radius:8px; border:1px solid var(--border); background:transparent; color:var(--txt2); font-size:12px; font-weight:500; cursor:pointer; transition:var(--tr); font-family:'Inter',sans-serif; }
+    .pg-btn:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
+    .pg-btn.active { background:var(--accent); border-color:var(--accent); color:var(--bg-primary); font-weight:700; }
+    .pg-btn:disabled { opacity:.35; cursor:not-allowed; }
+
+    /* ─── PROFILE ─── */
+    .av-lg { width:78px; height:78px; background:linear-gradient(135deg,var(--accent),#6c63ff); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:30px; font-weight:700; color:#fff; margin:0 auto 14px; box-shadow:0 8px 30px rgba(0,212,255,.3); }
+    .info-card { background:var(--bg-card); border:1px solid var(--border); border-radius:16px; padding:22px; }
+    .info-row  { display:flex; align-items:center; padding:11px 0; border-bottom:1px solid rgba(30,58,95,.5); }
+    .info-row:last-child { border-bottom:none; }
+    .ir-lbl    { font-size:12px; color:var(--muted); width:175px; flex-shrink:0; display:flex; align-items:center; gap:6px; }
+    .ir-val    { font-size:13.5px; color:var(--txt); font-weight:500; }
+
+    /* ─── DEVICE STATUS MINI (Action History) ─── */
+    .dsm-card { background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:16px 18px; display:flex; align-items:center; justify-content:space-between; transition:var(--tr); cursor:pointer; position:relative; overflow:hidden; }
+    .dsm-card::after { content:''; position:absolute; bottom:0; left:0; right:0; height:1px; background:transparent; transition:var(--tr); }
+    .dsm-card.on::after { background:linear-gradient(90deg,transparent,var(--green),transparent); }
+    .dsm-card:hover { border-color:rgba(0,212,255,.25); box-shadow:0 4px 16px rgba(0,0,0,.2); }
+    .dsm-left { display:flex; align-items:center; gap:12px; }
+    .dsm-icon { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; transition:var(--tr); }
+    .dsm-icon.on  { background:rgba(0,230,118,.15); color:var(--green); box-shadow:0 0 14px rgba(0,230,118,.2); }
+    .dsm-icon.off { background:rgba(255,255,255,.04); color:var(--muted); }
+    .dsm-name { font-size:14px; font-weight:600; color:var(--txt); margin-bottom:2px; }
+    .dsm-st   { font-size:11px; font-weight:500; }
+    .dsm-st.on  { color:var(--green); } .dsm-st.off { color:var(--muted); }
+    .badge-err { padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; background:rgba(255,82,82,.12); color:var(--red); border:1px solid rgba(255,82,82,.2); }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+/* ────────────────────────────────────────────
+   MOCK DATA
+──────────────────────────────────────────── */
+const CHART_DATA = {
+  labels: ['07:00','07:30','08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30','12:00'],
+  temp:   [24.5,25.1,25.8,26.3,27.0,27.5,28.2,27.8,27.3,26.9,26.2],
+  humid:  [68,67,65,64,62,61,59,60,63,65,66],
+  light:  [320,450,620,710,780,820,850,830,760,700,640],
+};
+
+const SENSOR_DATA = [
+  {id:'SN-001',loai:'Nhiệt độ',giaTri:27.5,donVi:'°C', thoiGian:'2026-08-27 10:30'},
+  {id:'SN-002',loai:'Độ ẩm',  giaTri:62,  donVi:'%',  thoiGian:'2026-08-27 10:30'},
+  {id:'SN-003',loai:'Ánh sáng',giaTri:820, donVi:'lux',thoiGian:'2026-08-27 10:30'},
+  {id:'SN-004',loai:'Nhiệt độ',giaTri:26.8,donVi:'°C', thoiGian:'2026-08-27 10:00'},
+  {id:'SN-005',loai:'Độ ẩm',  giaTri:65,  donVi:'%',  thoiGian:'2026-08-27 10:00'},
+  {id:'SN-006',loai:'Ánh sáng',giaTri:780, donVi:'lux',thoiGian:'2026-08-27 10:00'},
+  {id:'SN-007',loai:'Nhiệt độ',giaTri:25.3,donVi:'°C', thoiGian:'2026-08-27 09:30'},
+  {id:'SN-008',loai:'Độ ẩm',  giaTri:70,  donVi:'%',  thoiGian:'2026-08-27 09:30'},
+];
+
+const ACTION_DATA = [
+  {id:'AC-001',thietBi:'Điều hòa', hanhDong:'BẬT',trangThai:'Thành công',gioBat:'07:30',gioTat:'11:00',tgph:'0.3s'},
+  {id:'AC-002',thietBi:'Đèn LED',  hanhDong:'BẬT',trangThai:'Thành công',gioBat:'07:00',gioTat:'17:00',tgph:'0.1s'},
+  {id:'AC-003',thietBi:'Quạt máy', hanhDong:'TẮT',trangThai:'Thất bại',  gioBat:'08:00',gioTat:'—',    tgph:'5.0s'},
+  {id:'AC-004',thietBi:'Điều hòa', hanhDong:'TẮT',trangThai:'Thành công',gioBat:'11:00',gioTat:'13:00',tgph:'0.2s'},
+  {id:'AC-005',thietBi:'Quạt máy', hanhDong:'BẬT',trangThai:'Thành công',gioBat:'09:00',gioTat:'12:00',tgph:'0.4s'},
+  {id:'AC-006',thietBi:'Đèn LED',  hanhDong:'TẮT',trangThai:'Thất bại',  gioBat:'17:00',gioTat:'—',    tgph:'8.2s'},
+  {id:'AC-007',thietBi:'Điều hòa', hanhDong:'BẬT',trangThai:'Thành công',gioBat:'13:30',gioTat:'17:30',tgph:'0.5s'},
+  {id:'AC-008',thietBi:'Quạt máy', hanhDong:'TẮT',trangThai:'Thành công',gioBat:'12:00',gioTat:'—',    tgph:'0.2s'},
+];
+
+const DEVICE_ID_MAP = {'Điều hòa':'dh','Quạt máy':'qt','Đèn LED':'dl'};
+
+/* ────────────────────────────────────────────
+   SIDEBAR
+──────────────────────────────────────────── */
+const NAV = [
+  {id:'dashboard',      icon:'bi-grid-1x2-fill', label:'Dashboard'},
+  {id:'data-sensor',    icon:'bi-activity',       label:'Data Sensor'},
+  {id:'action-history', icon:'bi-clock-history',  label:'Action History'},
+  {id:'profile',        icon:'bi-person-circle',  label:'Profile'},
+];
+
+function Sidebar({page, go}) {
+  return (
+    <aside className="sidebar">
+      <div className="sidebar-logo">
+        <div className="logo-icon"><i className="bi bi-cpu"/></div>
+        <div>
+          <div className="logo-text">IoT Monitor</div>
+          <div className="logo-sub">Classroom Management</div>
+        </div>
+      </div>
+      <nav className="sidebar-nav">
+        <div className="nav-lbl">Main Menu</div>
+        {NAV.map(n => (
+          <div key={n.id} className={`nav-item ${page===n.id?'active':''}`} onClick={()=>go(n.id)}>
+            <i className={`bi ${n.icon} nav-icon`}/>
+            <span>{n.label}</span>
+          </div>
+        ))}
+      </nav>
+      <div className="sidebar-footer">
+        <div className="s-user">
+          <div className="u-avatar">AD</div>
+          <div>
+            <div className="u-name">Admin</div>
+            <div className="u-role">Quản trị viên</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+/* ────────────────────────────────────────────
+   TOPBAR
+──────────────────────────────────────────── */
+function Topbar({title, sub}) {
+  const now = new Date();
+  const t = now.toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'});
+  const d = now.toLocaleDateString('vi-VN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  return (
+    <header className="topbar">
+      <div>
+        <div className="topbar-title">{title}</div>
+        <div className="topbar-sub">{sub}</div>
+      </div>
+      <div className="d-flex align-items-center gap-3">
+        <div style={{fontSize:'12px',color:'var(--muted)',textAlign:'right'}}>
+          <div style={{color:'var(--txt)',fontWeight:600}}>{t}</div>
+          <div>{d}</div>
+        </div>
+        <div className="status-badge"><span className="status-dot"/>Trực tuyến</div>
+        <div style={{width:34,height:34,borderRadius:'50%',background:'rgba(0,212,255,.1)',border:'1px solid rgba(0,212,255,.2)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',color:'var(--txt2)',fontSize:16}}>
+          <i className="bi bi-bell"/>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+/* ────────────────────────────────────────────
+   METRIC CARD
+──────────────────────────────────────────── */
+function MetricCard({cls, icon, label, value, unit, sub, trend, trendLbl}) {
+  const tc = trend==='up'?'tr-up':trend==='down'?'tr-down':'tr-stab';
+  const ti = trend==='up'?'bi-arrow-up-short':trend==='down'?'bi-arrow-down-short':'bi-dash';
+  return (
+    <div className={`metric-card ${cls}`}>
+      <div className="mc-icon"><i className={`bi ${icon}`}/></div>
+      <div className="mc-lbl">{label}</div>
+      <div className="d-flex align-items-baseline gap-2">
+        <span className="mc-val">{value}</span>
+        <span className="mc-unit">{unit}</span>
+      </div>
+      <div className="mc-sub">
+        <span className={`mc-trend ${tc}`}><i className={`bi ${ti}`}/>{trendLbl}</span>
+        <span>{sub}</span>
+      </div>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────
+   SENSOR LINE CHART (Chart.js, no deps)
+──────────────────────────────────────────── */
+function SensorChart({ devs = [] }) {
+  const ref = React.useRef(null);
+  const chartRef = React.useRef(null);
+  
+  const dhOn = devs.find(d=>d.id==='dh')?.on;
+  const qtOn = devs.find(d=>d.id==='qt')?.on;
+  const dlOn = devs.find(d=>d.id==='dl')?.on;
+
+  React.useEffect(() => {
+    if (!ref.current) return;
+    if (chartRef.current) { chartRef.current.destroy(); }
+    const ctx = ref.current.getContext('2d');
+    
+    const datasets = [];
+    if (dhOn) {
+      datasets.push({
+        label: 'Nhiệt độ (°C)',
+        data: CHART_DATA.temp,
+        borderColor: '#ff6b6b',
+        backgroundColor: 'rgba(255,107,107,0.08)',
+        borderWidth: 2.5,
+        pointRadius: 4,
+        pointBackgroundColor: '#ff6b6b',
+        pointBorderWidth: 0,
+        tension: 0.4,
+        fill: false,
+        yAxisID: 'y',
+      });
+    }
+    if (qtOn) {
+      datasets.push({
+        label: 'Độ ẩm (%)',
+        data: CHART_DATA.humid,
+        borderColor: '#00d4ff',
+        backgroundColor: 'rgba(0,212,255,0.08)',
+        borderWidth: 2.5,
+        pointRadius: 4,
+        pointBackgroundColor: '#00d4ff',
+        pointBorderWidth: 0,
+        tension: 0.4,
+        fill: false,
+        yAxisID: 'y',
+      });
+    }
+    if (dlOn) {
+      datasets.push({
+        label: 'Ánh sáng (lux)',
+        data: CHART_DATA.light,
+        borderColor: '#ffab40',
+        backgroundColor: 'rgba(255,171,64,0.08)',
+        borderWidth: 2.5,
+        pointRadius: 4,
+        pointBackgroundColor: '#ffab40',
+        pointBorderWidth: 0,
+        tension: 0.4,
+        fill: false,
+        yAxisID: 'y2',
+      });
+    }
+
+    chartRef.current = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: CHART_DATA.labels,
+        datasets: datasets,
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#1a2f4e',
+            borderColor: '#1e3a5f',
+            borderWidth: 1,
+            titleColor: '#4a6fa5',
+            bodyColor: '#e8f4f8',
+            padding: 12,
+            cornerRadius: 10,
+          },
+        },
+        scales: {
+          x: {
+            grid: { color: 'rgba(30,58,95,0.7)', drawBorder: false },
+            ticks: { color: '#4a6fa5', font: { size: 11, family: 'Inter' } },
+            border: { color: 'rgba(30,58,95,0.8)' },
+          },
+          y: {
+            type: 'linear', position: 'left',
+            grid: { color: 'rgba(30,58,95,0.7)', drawBorder: false },
+            ticks: { color: '#4a6fa5', font: { size: 11, family: 'Inter' } },
+            border: { display: false },
+          },
+          y2: {
+            type: 'linear', position: 'right',
+            grid: { drawOnChartArea: false },
+            ticks: { color: '#4a6fa5', font: { size: 11, family: 'Inter' } },
+            border: { display: false },
+            min: 0, max: 1000,
+          },
+        },
+      },
+    });
+    return () => { if (chartRef.current) chartRef.current.destroy(); };
+  }, [dhOn, qtOn, dlOn]);
+
+  return (
+    <div className="chart-card mb-4">
+      <div className="d-flex align-items-start justify-content-between mb-4">
+        <div>
+          <div className="chart-title">Theo dõi cảm biến</div>
+          <div className="chart-sub">Dữ liệu cập nhật mỗi 30 phút hôm nay</div>
+        </div>
+        <div className="d-flex gap-3 flex-wrap">
+          {[{c:'#ff6b6b',l:'Nhiệt độ'},{c:'#00d4ff',l:'Độ ẩm'},{c:'#ffab40',l:'Ánh sáng'}].map(x=>(
+            <div key={x.l} className="leg-item">
+              <span className="leg-dot" style={{background:x.c}}/>
+              {x.l}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={{height:280}}>
+        <canvas ref={ref}/>
+      </div>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────
+   DEVICE TOGGLE
+──────────────────────────────────────────── */
+function DeviceToggle({icon, name, isOn, toggle}) {
+  return (
+    <div className={`device-card ${isOn?'on':'off'}`}>
+      <div className="dev-icon"><i className={`bi ${icon}`}/></div>
+      <div className="d-flex align-items-center justify-content-between">
+        <div>
+          <div className="dev-name">{name}</div>
+          <div className={isOn?'dev-st-on':'dev-st-off'}>
+            {isOn
+              ? <><i className="bi bi-circle-fill me-1" style={{fontSize:7}}/>Đang bật</>
+              : <><i className="bi bi-circle me-1" style={{fontSize:7}}/>Tắt</>}
+          </div>
+        </div>
+        <label className="toggle-sw">
+          <input type="checkbox" checked={isOn} onChange={toggle}/>
+          <span className="tog-slider"/>
+        </label>
+      </div>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────
+   DATA TABLE (generic)
+──────────────────────────────────────────── */
+function DataTable({cols, rows, pgSize=6}) {
+  const {useState} = React;
+  const [pg, setPg] = useState(1);
+  const total = rows.length;
+  const totalPg = Math.max(1, Math.ceil(total/pgSize));
+  const start = (pg-1)*pgSize;
+  const slice = rows.slice(start, start+pgSize);
+  return (
+    <div className="tbl-wrap">
+      <div className="tbl-head">
+        <div className="tbl-count">
+          Hiển thị <em>{Math.min(start+1,total)}–{Math.min(start+pgSize,total)}</em> / <em>{total}</em> bản ghi
+        </div>
+        <div style={{fontSize:12,color:'var(--muted)'}}><i className="bi bi-arrow-clockwise me-1"/>10:30 AM</div>
+      </div>
+      <div style={{overflowX:'auto'}}>
+        <table className="dt">
+          <thead><tr>{cols.map(c=><th key={c.k}>{c.label}</th>)}</tr></thead>
+          <tbody>
+            {slice.length===0
+              ? <tr><td colSpan={cols.length} style={{textAlign:'center',padding:40,color:'var(--muted)'}}>
+                  <i className="bi bi-inbox" style={{fontSize:28,display:'block',marginBottom:8}}/>Không có dữ liệu
+                </td></tr>
+              : slice.map((row,i)=>(
+                <tr key={i}>{cols.map(c=><td key={c.k}>{c.r?c.r(row[c.k],row):row[c.k]}</td>)}</tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+      <div className="pg-wrap">
+        <div className="pg-info">Trang {pg} / {totalPg}</div>
+        <div className="pg-btns">
+          <button className="pg-btn" onClick={()=>setPg(p=>Math.max(1,p-1))} disabled={pg===1}>
+            <i className="bi bi-chevron-left"/>
+          </button>
+          {Array.from({length:Math.min(totalPg,5)},(_,i)=>i+1).map(n=>(
+            <button key={n} className={`pg-btn ${pg===n?'active':''}`} onClick={()=>setPg(n)}>{n}</button>
+          ))}
+          <button className="pg-btn" onClick={()=>setPg(p=>Math.min(totalPg,p+1))} disabled={pg===totalPg}>
+            <i className="bi bi-chevron-right"/>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────
+   PAGE: DASHBOARD
+──────────────────────────────────────────── */
+function Dashboard({devs, togDev}) {
+  const tog = togDev;
+  const dh = devs.find(d=>d.id==='dh')?.on;
+  const qt = devs.find(d=>d.id==='qt')?.on;
+  const dl = devs.find(d=>d.id==='dl')?.on;
+
+  return (
+    <>
+      <Topbar title="Dashboard" sub="Tổng quan hệ thống phòng học"/>
+      <main className="page-content">
+        {/* Metric cards */}
+        <div className="d-flex align-items-center justify-content-between mb-3">
+          <span className="sec-title">Chỉ số hiện tại</span>
+          <span style={{fontSize:12,color:'var(--muted)'}}><i className="bi bi-clock me-1"/>10:30 AM</span>
+        </div>
+        <div className="row g-3 mb-4">
+          <div className="col-12 col-md-4">
+            <MetricCard cls="mc-temp"  icon="bi-thermometer-half"      label="Nhiệt độ" value="27.5" unit="°C"  sub="Môi trường lý tưởng" trend="up"   trendLbl="+0.3°C"/>
+          </div>
+          <div className="col-12 col-md-4">
+            <MetricCard cls="mc-humid" icon="bi-droplet-fill"          label="Độ ẩm"    value="62"   unit="%"   sub="Mức thoải mái"       trend="down" trendLbl="-3%"/>
+          </div>
+          <div className="col-12 col-md-4">
+            <MetricCard cls="mc-light" icon="bi-brightness-high-fill"  label="Ánh sáng" value="820"  unit="lux" sub="Đủ sáng học tập"      trend="stable" trendLbl="Ổn định"/>
+          </div>
+        </div>
+
+        {/* Chart */}
+        <div className="d-flex align-items-center mb-3">
+          <span className="sec-title">Biểu đồ thời gian thực</span>
+        </div>
+        <SensorChart devs={devs}/>
+
+        {/* Devices */}
+        <div className="d-flex align-items-center justify-content-between mb-3">
+          <span className="sec-title">Bảng điều khiển thiết bị</span>
+          <span style={{fontSize:12,color:'var(--muted)'}}>{devs.filter(d=>d.on).length}/{devs.length} thiết bị đang bật</span>
+        </div>
+        <div className="row g-3">
+          {devs.map(d=>(
+            <div key={d.id} className="col-12 col-md-4">
+              <DeviceToggle icon={d.icon} name={d.name} isOn={d.on} toggle={()=>tog(d.id)}/>
+            </div>
+          ))}
+        </div>
+      </main>
+    </>
+  );
+}
+
+/* ────────────────────────────────────────────
+   PAGE: DATA SENSOR
+──────────────────────────────────────────── */
+const S_COLS = [
+  {k:'id',       label:'ID',              r:v=><span className="c-id">{v}</span>},
+  {k:'loai',     label:'Tên cảm biến',    r:v=>`Cảm biến ${v.toLowerCase()}`},
+  {k:'giaTri',   label:'Giá trị cảm biến',r:(v,row)=><strong>{v} {row.donVi}</strong>},
+  {k:'thoiGian', label:'Thời gian cảm biến', r:v=><span style={{color:'var(--muted)',fontSize:13}}>{v}</span>},
+];
+
+function DataSensor() {
+  const {useState} = React;
+  const [f,setF] = useState({tg:'',loai:'Tất cả'});
+  const [rows,setRows] = useState(SENSOR_DATA);
+  const upd = (k,v)=>setF(p=>({...p,[k]:v}));
+  const search = ()=>{
+    let r=[...SENSOR_DATA];
+    if(f.loai!=='Tất cả') r=r.filter(x=>x.loai===f.loai);
+    if(f.tg) r=r.filter(x=>x.thoiGian.includes(f.tg));
+    setRows(r);
+  };
+  const reset=()=>{setF({tg:'',loai:'Tất cả'});setRows(SENSOR_DATA);};
+  return (
+    <>
+      <Topbar title="Data Sensor" sub="Lịch sử dữ liệu cảm biến"/>
+      <main className="page-content">
+        <div className="d-flex mb-3"><span className="sec-title">Bộ lọc tra cứu</span></div>
+        <div className="filter-bar mb-4">
+          <div className="row g-3 align-items-end">
+            <div className="col-12 col-sm-6 col-lg-3">
+              <div className="f-lbl">Tìm kiếm thời gian</div>
+              <input id="fs-tg" className="fc-dark w-100" type="text" placeholder="2026/08/17 08:45:20" value={f.tg} onChange={e=>upd('tg',e.target.value)}/>
+            </div>
+            <div className="col-12 col-sm-6 col-lg-3">
+              <div className="f-lbl">Bộ lọc cảm biến</div>
+              <select id="fs-type" className="form-select fc-dark w-100" value={f.loai} onChange={e=>upd('loai',e.target.value)}>
+                {['Tất cả','Nhiệt độ','Độ ẩm','Ánh sáng'].map(t=><option key={t}>{t}</option>)}
+              </select>
+            </div>
+            <div className="col-12 col-lg-auto d-flex gap-2">
+              <button id="btn-search-sensor" className="btn btn-search flex-grow-1" onClick={search} style={{padding:'8px 24px',background:'#3b519c'}}>Tìm kiếm</button>
+              <button id="btn-reset-sensor" className="btn btn-rst" onClick={reset} title="Làm mới" style={{color:'#3b519c',borderColor:'var(--border)'}}><i className="bi bi-arrow-repeat"/></button>
+            </div>
+          </div>
+        </div>
+        <div className="d-flex mb-3"><span className="sec-title">Dữ liệu cảm biến</span></div>
+        <DataTable cols={S_COLS} rows={rows} pgSize={6}/>
+      </main>
+    </>
+  );
+}
+
+/* ────────────────────────────────────────────
+   PAGE: ACTION HISTORY
+──────────────────────────────────────────── */
+const A_COLS = [
+  {k:'id',       label:'ID',            r:v=><span className="c-id">{v}</span>},
+  {k:'thietBi',  label:'Thiết bị',     r:v=><strong>{v}</strong>},
+  {k:'hanhDong', label:'Hành động',    r:v=>(
+    <span style={{padding:'2px 9px',borderRadius:20,fontSize:11,fontWeight:700,
+      background:v==='BẬT'?'rgba(0,230,118,.15)':'rgba(255,82,82,.15)',
+      color:v==='BẬT'?'var(--green)':'var(--red)'}}>{v}</span>
+  )},
+  {k:'trangThai',label:'Trạng thái',   r:v=>(
+    <span className="d-flex align-items-center">
+      <span className={`dot-ind ${v==='Thành công'?'dot-ok':'dot-err'}`}/>
+      <span style={{color:v==='Thành công'?'var(--green)':'var(--red)',fontWeight:500}}>{v}</span>
+    </span>
+  )},
+  {k:'gioBat',   label:'Giờ bật',      r:v=><span style={{color:'var(--green)',fontSize:12}}>{v}</span>},
+  {k:'gioTat',   label:'Giờ tắt',      r:v=><span style={{color:v==='—'?'var(--muted)':'var(--red)',fontSize:12}}>{v}</span>},
+  {k:'tgph',     label:'T/g phản hồi', r:v=><span style={{color:parseFloat(v)>1?'var(--red)':'var(--accent)',fontWeight:600,fontSize:12}}>{v}</span>},
+];
+
+function ActionHistory({devs, togDev, hist = []}) {
+  const {useState, useEffect} = React;
+  const [f,setF] = useState({dev:'Tất cả',act:'Tất cả',st:'Tất cả'});
+  const [rows,setRows] = useState(hist);
+  const upd=(k,v)=>setF(p=>({...p,[k]:v}));
+
+  useEffect(() => {
+    let r=[...hist];
+    if(f.dev!=='Tất cả') r=r.filter(x=>x.thietBi===f.dev);
+    if(f.act!=='Tất cả') r=r.filter(x=>x.hanhDong===f.act);
+    if(f.st!=='Tất cả')  r=r.filter(x=>x.trangThai===f.st);
+    setRows(r);
+  }, [hist]);
+
+  const search=()=>{
+    let r=[...hist];
+    if(f.dev!=='Tất cả') r=r.filter(x=>x.thietBi===f.dev);
+    if(f.act!=='Tất cả') r=r.filter(x=>x.hanhDong===f.act);
+    if(f.st!=='Tất cả')  r=r.filter(x=>x.trangThai===f.st);
+    setRows(r);
+  };
+  const reset=()=>{setF({dev:'Tất cả',act:'Tất cả',st:'Tất cả'});setRows(hist);};
+
+  // Renderer toggle cho cột Điều khiển
+  const renderToggle = (v, row) => {
+    const devId = DEVICE_ID_MAP[row.thietBi];
+    const device = devs.find(d=>d.id===devId);
+    if (row.trangThai==='Thất bại') return <span className="badge-err"><i className="bi bi-exclamation-triangle me-1" style={{fontSize:10}}/> Lỗi</span>;
+    if (!device) return null;
+    return (
+      <label className="toggle-sw" onClick={e=>e.stopPropagation()}>
+        <input type="checkbox" checked={device.on} onChange={()=>togDev(devId)}/>
+        <span className="tog-slider"/>
+      </label>
+    );
+  };
+
+  const A_COLS_EX = [
+    ...A_COLS,
+    {k:'trangThai', label:'Điều khiển', r: renderToggle},
+  ];
+
+  return (
+    <>
+      <Topbar title="Action History" sub="Lịch sử điều khiển thiết bị"/>
+      <main className="page-content">
+
+        {/* Device status strip */}
+        <div className="d-flex align-items-center justify-content-between mb-3">
+          <span className="sec-title">Trạng thái thiết bị hiện tại</span>
+          <span style={{fontSize:12,color:'var(--muted)'}}>{devs.filter(d=>d.on).length}/{devs.length} đang bật</span>
+        </div>
+        <div className="row g-3 mb-4">
+          {devs.map(d=>(
+            <div key={d.id} className="col-12 col-md-4">
+              <div className={`dsm-card ${d.on?'on':'off'}`} onClick={()=>togDev(d.id)}>
+                <div className="dsm-left">
+                  <div className={`dsm-icon ${d.on?'on':'off'}`}><i className={`bi ${d.icon}`}/></div>
+                  <div>
+                    <div className="dsm-name">{d.name}</div>
+                    <div className={`dsm-st ${d.on?'on':'off'}`}>
+                      <i className={`bi ${d.on?'bi-circle-fill':'bi-circle'} me-1`} style={{fontSize:7}}/>
+                      {d.on?'Đang bật':'Tắt'}
+                    </div>
+                  </div>
+                </div>
+                <label className="toggle-sw" onClick={e=>e.stopPropagation()}>
+                  <input type="checkbox" checked={d.on} onChange={()=>togDev(d.id)}/>
+                  <span className="tog-slider"/>
+                </label>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="d-flex mb-3"><span className="sec-title">Bộ lọc tra cứu</span></div>
+        <div className="filter-bar mb-4">
+          <div className="row g-3 align-items-end">
+            <div className="col-12 col-sm-6 col-lg-3">
+              <div className="f-lbl">Search Time</div>
+              <input id="fa-time" className="fc-dark w-100" type="text" placeholder="2026/08/17" value={f.time} onChange={e=>upd('time',e.target.value)}/>
+            </div>
+            <div className="col-12 col-sm-6 col-lg-2">
+              <div className="f-lbl">Device</div>
+              <select id="fa-dev" className="form-select fc-dark w-100" value={f.dev} onChange={e=>upd('dev',e.target.value)}>
+                {['Tất cả','Điều hòa','Quạt máy','Đèn LED'].map(t=><option key={t}>{t}</option>)}
+              </select>
+            </div>
+            <div className="col-12 col-sm-6 col-lg-2">
+              <div className="f-lbl">Action</div>
+              <select id="fa-act" className="form-select fc-dark w-100" value={f.act} onChange={e=>upd('act',e.target.value)}>
+                {['Tất cả','BẬT','TẮT'].map(t=><option key={t}>{t}</option>)}
+              </select>
+            </div>
+            <div className="col-12 col-sm-6 col-lg-2">
+              <div className="f-lbl">Status</div>
+              <select id="fa-st" className="form-select fc-dark w-100" value={f.st} onChange={e=>upd('st',e.target.value)}>
+                {['Tất cả','Thành công','Thất bại'].map(t=><option key={t}>{t}</option>)}
+              </select>
+            </div>
+            <div className="col-12 col-lg-auto d-flex gap-2">
+              <button id="btn-search-action" className="btn btn-search flex-grow-1" onClick={search} style={{padding:'8px 24px',background:'#3b519c'}}>Tìm kiếm</button>
+              <button id="btn-reset-action" className="btn btn-rst" onClick={reset} title="Làm mới" style={{color:'#3b519c',borderColor:'var(--border)'}}><i className="bi bi-arrow-repeat"/></button>
+            </div>
+          </div>
+        </div>
+        <div className="d-flex mb-3"><span className="sec-title">Lịch sử điều khiển</span></div>
+        <DataTable cols={A_COLS_EX} rows={rows} pgSize={6}/>
+      </main>
+    </>
+  );
+}
+
+/* ────────────────────────────────────────────
+   PAGE: PROFILE
+──────────────────────────────────────────── */
+function Profile() {
+  const INFO=[
+    {label:'Họ và tên',          value:'Nguyễn Cao Kiên',         icon:'bi-person'},
+    {label:'Mã sinh viên',       value:'B23DCAT159',              icon:'bi-card-heading'},
+    {label:'Số điện thoại',      value:'0987809265',              icon:'bi-telephone'},
+    {label:'Email',              value:'Nguyenkien26122005@gmail.com', icon:'bi-envelope'},
+    {label:'Vai trò',            value:'Quản trị viên hệ thống',   icon:'bi-shield-check'},
+    {label:'Phòng phụ trách',    value:'302',                     icon:'bi-door-open'},
+    {label:'Ngày tạo tài khoản', value:'01/09/2025',                icon:'bi-calendar-check'},
+    {label:'Lần đăng nhập cuối', value:'27/08/2026 – 10:28 AM',    icon:'bi-clock-history'},
+  ];
+  const STATS=[
+    {label:'Thiết bị quản lý',   value:'12',  icon:'bi-cpu',      color:'#00d4ff'},
+    {label:'Cảnh báo tháng này', value:'3',   icon:'bi-bell',     color:'#ffab40'},
+    {label:'Lịch sử hành động',  value:'248', icon:'bi-activity', color:'#00e676'},
+  ];
+  return (
+    <>
+      <Topbar title="Profile" sub="Thông tin tài khoản quản trị"/>
+      <main className="page-content">
+        <div className="row g-4">
+          <div className="col-12 col-lg-4">
+            <div className="info-card text-center mb-3">
+              <div className="av-lg">NK</div>
+              <div style={{fontSize:18,fontWeight:700}}>Nguyễn Cao Kiên</div>
+              <div style={{fontSize:13,color:'var(--muted)',margin:'6px 0 14px'}}>Quản trị viên hệ thống</div>
+              <span style={{padding:'4px 16px',borderRadius:20,fontSize:12,fontWeight:600,background:'rgba(0,230,118,.15)',color:'var(--green)',border:'1px solid rgba(0,230,118,.3)'}}>
+                <i className="bi bi-circle-fill me-1" style={{fontSize:7}}/>Đang hoạt động
+              </span>
+            </div>
+            <div className="row g-3">
+              {STATS.map((s,i)=>(
+                <div key={i} className="col-12">
+                  <div className="info-card">
+                    <div className="d-flex align-items-center gap-3">
+                      <div style={{width:42,height:42,borderRadius:10,background:`${s.color}20`,color:s.color,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,flexShrink:0}}>
+                        <i className={`bi ${s.icon}`}/>
+                      </div>
+                      <div>
+                        <div style={{fontSize:22,fontWeight:800,color:s.color}}>{s.value}</div>
+                        <div style={{fontSize:12,color:'var(--muted)'}}>{s.label}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="col-12 col-lg-8">
+            <div className="d-flex mb-3"><span className="sec-title">Thông tin chi tiết</span></div>
+            <div className="info-card mb-4">
+              {INFO.map((x,i)=>(
+                <div key={i} className="info-row">
+                  <div className="ir-lbl"><i className={`bi ${x.icon}`} style={{color:'var(--accent)',fontSize:14}}/>{x.label}</div>
+                  <div className="ir-val">{x.value}</div>
+                </div>
+              ))}
+            </div>
+
+          </div>
+        </div>
+      </main>
+    </>
+  );
+}
+
+/* ────────────────────────────────────────────
+   APP ROOT
+──────────────────────────────────────────── */
+const INIT_DEVS = [
+  {id:'dh', icon:'bi-snow2',         name:'Điều hòa', on:false},
+  {id:'qt', icon:'bi-fan',           name:'Quạt máy', on:false},
+  {id:'dl', icon:'bi-lightbulb-fill',name:'Đèn LED',  on:false},
+];
+
+function App() {
+  const {useState, useEffect} = React;
+  const [page, setPage] = useState('dashboard');
+  const [devs, setDevs] = useState(INIT_DEVS);
+  const [hist, setHist] = useState(ACTION_DATA);
+
+  const togDev = id => {
+    setDevs(p => {
+      const dev = p.find(d=>d.id===id);
+      const newOn = !dev.on;
+      setHist(h => {
+        const nr = {
+          id: `AC-${String(h.length+1).padStart(3,'0')}`,
+          thietBi: dev.name, hanhDong: newOn?'BẬT':'TẮT',
+          trangThai: 'Thành công', gioBat: newOn?new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'}):'—',
+          gioTat: !newOn?new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'}):'—',
+          tgph: '0.1s'
+        };
+        return [nr, ...h];
+      });
+      return p.map(d=>d.id===id?{...d,on:newOn}:d);
+    });
+  };
+
+  const renderPage = () => {
+    switch(page) {
+      case 'dashboard':       return <Dashboard devs={devs} togDev={togDev}/>;
+      case 'data-sensor':     return <DataSensor/>;
+      case 'action-history':  return <ActionHistory devs={devs} togDev={togDev} hist={hist}/>;
+      case 'profile':         return <Profile/>;
+      default:                return <Dashboard devs={devs} togDev={togDev}/>;
+    }
+  };
+
+  return (
+    <div className="app-layout">
+      <Sidebar page={page} go={setPage}/>
+      <div className="main-content">{renderPage()}</div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
